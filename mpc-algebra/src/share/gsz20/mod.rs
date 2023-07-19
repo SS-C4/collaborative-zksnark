@@ -807,6 +807,33 @@ pub mod field {
         shifted_result
     }
 
+    /* New protocols */
+
+    /// Exp and Reveal for 52
+    /// Computes a^52 for shared [a]
+    pub fn exp_52<F: FftField>(
+        a: &GszFieldShare<F>,
+    ) -> F {
+        let a2 = mult(a.clone(), a, false);
+        let a4 = mult(a2.clone(), &a2, false);
+        let a8 = mult(a4.clone(), &a4, false);
+        let a16 = mult(a8.clone(), &a8, false);
+        let a32 = mult(a16.clone(), &a16, false);
+        let a48 = mult(a32.clone(), &a16, false);
+        let a52 = mult(a48.clone(), &a4, false);
+
+        open(&a52)
+    }
+
+    /// RAN52 - Computes a random 52nd root of unity
+    /// Requires p = 1 mod 52
+    pub fn ran52<F: FftField>() -> GszFieldShare<F> {
+        let mut r = rand::<F>();
+        let r52 = exp_52(&r);
+        r.scale(&r52.inverse().unwrap());
+        r
+    }
+
     pub struct GszFieldTriple<F: Field>(
         pub GszFieldShare<F>,
         pub GszFieldShare<F>,
@@ -1371,6 +1398,60 @@ pub mod group {
             end_timer!(timer);
         }
     }
+
+    /* New protocols */
+
+    /// Dodis-Yampolskiy distributed PRF
+    /// Computes g^{1/(x+sk)} for shared input [x], generator g, and shared key [sk]
+    pub fn dy_prf<G: Group, M: Msm<G, G::ScalarField>, S: BeaverSource<GszFieldShare<G::ScalarField>,GszFieldShare<G::ScalarField>,GszFieldShare<G::ScalarField>>>(
+        gen: &G,
+        sk: &GszFieldShare<G::ScalarField>,
+        x: &GszFieldShare<G::ScalarField>,
+        _source: &mut S,
+    ) -> G {
+        let mut cl = sk.clone();
+        let tmp = cl.add(x);
+        let t = tmp.inv(_source);
+        let y = GszGroupShare::<G,M>::scale_pub_group(*gen, &t);
+        open(&y)
+    }
+
+    /// PERM_52 - Computes a random permutation of the 52 roots of unity
+    /// Requires p = 1 mod 52
+    pub fn perm52<G: Group, M: Msm<G, G::ScalarField>, S: BeaverSource<GszFieldShare<G::ScalarField>,GszFieldShare<G::ScalarField>,GszFieldShare<G::ScalarField>>>(
+        gen: &G,
+        sk: &GszFieldShare<G::ScalarField>,
+        _source: &mut S,
+    ) -> Vec<GszFieldShare<G::ScalarField>> {
+        let num = 200;
+        
+        let mut perm = Vec::new();
+        let mut roots = Vec::new();
+        let mut prfs = Vec::new();
+        
+        // Should be batched later
+        for i in 0..num {
+            roots.push(field::ran52::<G::ScalarField>());
+            prfs.push(dy_prf::<G,M,S>(gen, sk, &roots[i], _source));
+        }
+
+        // Keep the first 52 unique entries in the permutation
+        for i in 0..52 {
+            let mut found = false;
+            for j in 0..perm.len() {
+                if prfs[i] == prfs[j] {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                perm.push(roots[i].clone());
+            }
+        }
+
+        perm
+    }
+
 }
 
 pub use group::GszGroupShare;
