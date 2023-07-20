@@ -1,7 +1,7 @@
 use ark_ec::{group::Group, AffineCurve, PairingEngine};
-use ark_ff::{FftField, Field, PrimeField, UniformRand};
+use ark_ff::{FftField, Field, PrimeField, UniformRand, SquareRootField};
 use log::debug;
-use mpc_algebra::gsz20::group::GszGroupShare;
+use mpc_algebra::gsz20::group::{GszGroupShare, perm64, open_perm};
 use mpc_algebra::{
     msm::NaiveMsm, share::field::FieldShare, share::group::GroupShare, share::gsz20::*,
     share::pairing::PairingShare, Reveal,
@@ -203,6 +203,13 @@ fn test_pairing<E: PairingEngine, S: PairingShare<E>>() {
     }
 }
 
+fn test_perm<F: FftField, G: Group>()
+where G::ScalarField: SquareRootField {
+    let rng = &mut ark_std::test_rng();
+    let perm = perm64::<G, NaiveMsm<G>>(&G::rand(rng));
+    open_perm::<G>(perm);
+}
+
 fn main() {
     env_logger::builder().format_timestamp(None).init();
     //env_logger::builder().format_timestamp(None).format_module_path(false).init();
@@ -211,14 +218,16 @@ fn main() {
     println!("{:?}", opt);
     Net::init_from_file(opt.input.to_str().unwrap(), opt.id);
 
-    test::<ark_bls12_377::Fr>();
-    test_ip::<ark_bls12_377::Fr>();
-    test_group::<ark_bls12_377::G1Projective>();
-    test_group::<ark_bls12_377::G2Projective>();
-    test_group::<ark_bls12_377::G1Affine>();
-    test_group::<ark_bls12_377::G2Affine>();
-    test_mul_field::<ark_bls12_377::Bls12_377>();
-    test_pairing::<ark_bls12_377::Bls12_377, GszPairingShare<ark_bls12_377::Bls12_377>>();
+    // test::<ark_bls12_377::Fr>();
+    // test_ip::<ark_bls12_377::Fr>();
+    // test_group::<ark_bls12_377::G1Projective>();
+    // test_group::<ark_bls12_377::G2Projective>();
+    // test_group::<ark_bls12_377::G1Affine>();
+    // test_group::<ark_bls12_377::G2Affine>();
+    // test_mul_field::<ark_bls12_377::Bls12_377>();
+    // test_pairing::<ark_bls12_377::Bls12_377, GszPairingShare<ark_bls12_377::Bls12_377>>();
+
+    test_perm::<ark_bls12_377::Fr, ark_bls12_377::G1Projective>();
 
     debug!("Done");
     Net::deinit();
