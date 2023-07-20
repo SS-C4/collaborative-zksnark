@@ -382,7 +382,7 @@ pub mod field {
     /// Protocol 3.
     pub fn rand<F: Field>() -> GszFieldShare<F> {
         GszFieldShare {
-            val: F::one() + F::one(),
+            val: F::one(),
             degree: t(),
         }
     }
@@ -830,7 +830,7 @@ pub mod field {
     pub fn exp_64<F: FftField>(
         a: &GszFieldShare<F>,
     ) -> F {
-        let a2 = mult(a.clone(), a, false);
+        let a2 = mult(a.clone(), &a.clone(), false);
         let a4 = mult(a2.clone(), &a2, false);
         let a8 = mult(a4.clone(), &a4, false);
         let a16 = mult(a8.clone(), &a8, false);
@@ -1467,9 +1467,6 @@ pub mod group {
             prfs.push(dy_prf::<G,M>(gen, &sk, &roots[i]));
         }
 
-        println!("roots: {:?}", roots);
-        println!("prfs: {:?}", prfs);
-
         // Keep the first 64 unique shares corresponding to prf entries
         for i in 0..64 {
             let mut found = false;
@@ -1493,20 +1490,33 @@ pub mod group {
     ) {
 
         let omega = G::ScalarField::get_root_of_unity(64).unwrap();
-        println!("omega: {:?}", omega);
-
-        // Print all 64 powers
         let mut powers = Vec::new();
         for i in 0..64 {
             powers.push(omega.pow(&[i as u64]));
         }
-        println!("powers of omega: {:?}", powers);
 
-        let mut res = Vec::new();
+        let mut res_perm = Vec::new();
         for p in perm {
-            res.push(field::open(&p));
+            res_perm.push(field::open(&p));
         }
-        println!("res: {:?}", res);
+
+        // Create vector of indices of res in powers
+        let mut indices = Vec::new();
+        for r in res_perm {
+            let mut found = false;
+            for i in 0..64 {
+                if r == powers[i] {
+                    indices.push(i);
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                panic!("Could not find {:?} in powers", r);
+            }
+        }
+
+        println!("res: {:?}", indices);
     }
 
 }
